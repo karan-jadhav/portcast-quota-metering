@@ -1,6 +1,7 @@
 from pydantic import computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 class Settings(BaseSettings):
     DATABASE_URL: str
 
@@ -13,9 +14,10 @@ class Settings(BaseSettings):
         elif url_str.startswith("postgres://"):
             return url_str.replace("postgres://", "postgresql+asyncpg://", 1)
         return url_str
-    
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
 
 
-settings = Settings() # type: ignore
+settings = Settings()  # type: ignore
