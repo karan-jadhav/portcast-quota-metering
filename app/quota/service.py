@@ -18,6 +18,7 @@ class ReservationError(Exception):
 
 class FeatureUsage(TypedDict):
     used_units: int
+    available_units: int
     next_reset_at: datetime
 
 
@@ -31,9 +32,7 @@ async def configure_quota(
         raise ValueError("limit_units cannot be negative")
 
     async with db.begin():
-        return await repository.upsert_quota_limit(
-            db, org_id, feature, limit_units
-        )
+        return await repository.upsert_quota_limit(db, org_id, feature, limit_units)
 
 
 async def get_feature_usage(
@@ -43,13 +42,16 @@ async def get_feature_usage(
 ) -> FeatureUsage:
     now = datetime.now(UTC)
     period = get_cycle_month(now)
-    used_units = await repository.get_used_units(db, org_id, feature, period.start)
+    usage = await repository.get_feature_usage(
+        db, org_id, feature, period.start
+    )
 
-    if used_units is None:
+    if usage is None:
         raise ValueError("quota is not configured for this organization and feature")
 
     return {
-        "used_units": used_units,
+        "used_units": usage["used_units"],
+        "available_units": usage["available_units"],
         "next_reset_at": period.next_reset_at,
     }
 

@@ -13,6 +13,7 @@ router = APIRouter(prefix="/quota", tags=["quota"])
 
 class QuotaUsageResponse(BaseModel):
     used_units: int
+    available_units: int
     next_reset_at: datetime
 
 
@@ -29,11 +30,11 @@ async def get_feature_usage(
         usage = await service.get_feature_usage(db, org_id, feature)
     except ValueError as exc:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
         ) from exc
 
     return QuotaUsageResponse(
         used_units=usage["used_units"],
+        available_units=usage["available_units"],
         next_reset_at=usage["next_reset_at"],
     )

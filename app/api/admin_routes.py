@@ -30,9 +30,7 @@ async def configure_quota(
     request: QuotaLimitRequest,
     db: AsyncSession = Depends(get_db),
 ) -> QuotaLimitResponse:
-    quota = await service.configure_quota(
-        db, org_id, feature, request.limit_units
-    )
+    quota = await service.configure_quota(db, org_id, feature, request.limit_units)
     return QuotaLimitResponse(
         org_id=quota["org_id"],
         feature=quota["feature"],

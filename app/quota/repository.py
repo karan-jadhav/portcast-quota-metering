@@ -269,16 +269,19 @@ async def release_reservation(db: AsyncSession, reservation_id: UUID):
     return reservation
 
 
-async def get_used_units(
+async def get_feature_usage(
     db: AsyncSession,
     org_id: UUID,
     feature: str,
     period_start: datetime,
-) -> int | None:
+):
     result = await db.execute(
         text(
             """
-            SELECT COALESCE(counter.used_units, 0) AS used_units
+            SELECT COALESCE(counter.used_units, 0) AS used_units,
+                   COALESCE(counter.limit_units, quota_limit.limit_units)
+                   - COALESCE(counter.used_units, 0)
+                   - COALESCE(counter.reserved_units, 0) AS available_units
             FROM quota_limits AS quota_limit
             LEFT JOIN quota_counters AS counter
               ON counter.org_id = quota_limit.org_id
@@ -294,4 +297,4 @@ async def get_used_units(
             "period_start": period_start,
         },
     )
-    return result.scalar_one_or_none()
+    return result.mappings().one_or_none()
