@@ -26,9 +26,7 @@ async def api_client() -> AsyncIterator[tuple[httpx.AsyncClient, object]]:
     app.dependency_overrides[get_db] = override_get_db
     transport = httpx.ASGITransport(app=app)
 
-    async with httpx.AsyncClient(
-        transport=transport, base_url="http://test"
-    ) as client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         yield client, db
 
     app.dependency_overrides.clear()

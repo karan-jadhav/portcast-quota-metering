@@ -42,9 +42,7 @@ async def get_feature_usage(
 ) -> FeatureUsage:
     now = datetime.now(UTC)
     period = get_cycle_month(now)
-    usage = await repository.get_feature_usage(
-        db, org_id, feature, period.start
-    )
+    usage = await repository.get_feature_usage(db, org_id, feature, period.start)
 
     if usage is None:
         raise ValueError("quota is not configured for this organization and feature")

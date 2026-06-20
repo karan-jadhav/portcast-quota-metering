@@ -29,18 +29,22 @@ async def test_concurrent_requests_never_exceed_limit(quota_factory) -> None:
 
     async with AsyncSessionLocal() as db:
         counter = (
-            await db.execute(
-                text(
-                    """
+            (
+                await db.execute(
+                    text(
+                        """
                     SELECT used_units, reserved_units,
                            limit_units - used_units - reserved_units AS available_units
                     FROM quota_counters
                     WHERE org_id = :org_id AND feature = :feature
                     """
-                ),
-                {"org_id": org_id, "feature": feature},
+                    ),
+                    {"org_id": org_id, "feature": feature},
+                )
             )
-        ).mappings().one()
+            .mappings()
+            .one()
+        )
 
     assert sum(results) == 100
     assert counter["used_units"] + counter["reserved_units"] == 100
@@ -65,9 +69,10 @@ async def test_concurrent_retry_reserves_once(quota_factory) -> None:
 
     async with AsyncSessionLocal() as db:
         row = (
-            await db.execute(
-                text(
-                    """
+            (
+                await db.execute(
+                    text(
+                        """
                     SELECT counter.reserved_units,
                            COUNT(reservation.reservation_id) AS reservations
                     FROM quota_counters AS counter
@@ -78,10 +83,13 @@ async def test_concurrent_retry_reserves_once(quota_factory) -> None:
                     WHERE counter.org_id = :org_id AND counter.feature = :feature
                     GROUP BY counter.reserved_units
                     """
-                ),
-                {"org_id": org_id, "feature": feature},
+                    ),
+                    {"org_id": org_id, "feature": feature},
+                )
             )
-        ).mappings().one()
+            .mappings()
+            .one()
+        )
 
     assert len({item["reservation_id"] for item in reservations}) == 1
     assert row["reserved_units"] == 1

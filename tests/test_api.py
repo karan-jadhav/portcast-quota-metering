@@ -51,9 +51,7 @@ async def test_usage_response(api_client) -> None:
             }
         ),
     ):
-        response = await client.get(
-            f"/quota/orgs/{ORG_ID}/features/{FEATURE}"
-        )
+        response = await client.get(f"/quota/orgs/{ORG_ID}/features/{FEATURE}")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -71,9 +69,7 @@ async def test_usage_returns_404_when_quota_is_not_configured(api_client) -> Non
         "get_feature_usage",
         AsyncMock(side_effect=ValueError("quota is not configured")),
     ):
-        response = await client.get(
-            f"/quota/orgs/{ORG_ID}/features/{FEATURE}"
-        )
+        response = await client.get(f"/quota/orgs/{ORG_ID}/features/{FEATURE}")
 
     assert response.status_code == 404
 

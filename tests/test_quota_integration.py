@@ -72,21 +72,18 @@ async def test_batch_is_all_or_nothing(quota_factory) -> None:
     org_id, feature = await quota_factory(10)
 
     async with AsyncSessionLocal() as db:
-        await reserve_quota(
-            db, org_id, feature, 8, "accepted", datetime.now(UTC)
-        )
+        await reserve_quota(db, org_id, feature, 8, "accepted", datetime.now(UTC))
 
     with pytest.raises(QuotaExceededError):
         async with AsyncSessionLocal() as db:
-            await reserve_quota(
-                db, org_id, feature, 3, "rejected", datetime.now(UTC)
-            )
+            await reserve_quota(db, org_id, feature, 3, "rejected", datetime.now(UTC))
 
     async with AsyncSessionLocal() as db:
         row = (
-            await db.execute(
-                text(
-                    """
+            (
+                await db.execute(
+                    text(
+                        """
                     SELECT reserved_units,
                            (SELECT COUNT(*) FROM quota_reservations
                             WHERE org_id = :org_id
@@ -94,10 +91,13 @@ async def test_batch_is_all_or_nothing(quota_factory) -> None:
                     FROM quota_counters
                     WHERE org_id = :org_id AND feature = :feature
                     """
-                ),
-                {"org_id": org_id, "feature": feature},
+                    ),
+                    {"org_id": org_id, "feature": feature},
+                )
             )
-        ).mappings().one()
+            .mappings()
+            .one()
+        )
 
     assert row["reserved_units"] == 8
     assert row["rejected_rows"] == 0
@@ -129,9 +129,10 @@ async def test_expired_reservation_returns_capacity(quota_factory) -> None:
 
     async with AsyncSessionLocal() as db:
         row = (
-            await db.execute(
-                text(
-                    """
+            (
+                await db.execute(
+                    text(
+                        """
                     SELECT reservation.status, counter.reserved_units
                     FROM quota_reservations AS reservation
                     JOIN quota_counters AS counter
@@ -140,10 +141,13 @@ async def test_expired_reservation_returns_capacity(quota_factory) -> None:
                      AND counter.period_start = reservation.period_start
                     WHERE reservation.reservation_id = :reservation_id
                     """
-                ),
-                {"reservation_id": reservation["reservation_id"]},
+                    ),
+                    {"reservation_id": reservation["reservation_id"]},
+                )
             )
-        ).mappings().one()
+            .mappings()
+            .one()
+        )
 
     assert row["status"] == "expired"
     assert row["reserved_units"] == 0
