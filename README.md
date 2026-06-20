@@ -36,6 +36,21 @@ docker compose down -v
 | `POST` | `/user/orgs/{org_id}/features/{feature}/items` | Process items using quota |
 | `GET` | `/quota/orgs/{org_id}/features/{feature}` | Read current usage and reset time |
 
+## Project Structure
+
+```text
+app/
+  api/          FastAPI routes
+  quota/        Quota service, repository, and monthly period logic
+  config.py     Application settings
+  db.py         Database engine and sessions
+  main.py       FastAPI application
+
+migrations/     PostgreSQL schema and seed data
+scripts/        Benchmarks and expired-reservation cleanup
+tests/          API, integration, period, and concurrency tests
+```
+
 The consumer endpoint requires an `Idempotency-Key` header. It calculates quota units from the number of items in the request.
 
 Example request:
@@ -48,7 +63,7 @@ curl -X POST \
   -d '{"items":["container-1","container-2"]}'
 ```
 
-The seed data includes `container-tracking` and `sailing-schedule` limits for three example organizations. See `migrations/002_seed.sql` for their IDs and limits.
+The seed data includes four features with different limits across ten example organizations. See `migrations/002_seed.sql` for their IDs and limits.
 
 ## Local Python Setup
 
