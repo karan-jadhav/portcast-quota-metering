@@ -2,18 +2,35 @@ services:
   db:
     image: postgres:18
     restart: unless-stopped
-    env_file:
-      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-portcast}
+      POSTGRES_USER: ${POSTGRES_USER:-portcast}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-portcast}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
       - ./migrations:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
-      interval: 10s
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-portcast} -d ${POSTGRES_DB:-portcast}",
+        ]
+      interval: 2s
       timeout: 5s
-      retries: 5
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-portcast}:${POSTGRES_PASSWORD:-portcast}@db:5432/${POSTGRES_DB:-portcast}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
 
 volumes:
   postgres_data:
