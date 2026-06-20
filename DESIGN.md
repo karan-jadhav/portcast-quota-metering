@@ -32,7 +32,9 @@ For example, June 2026 starts at `2026-06-01T00:00:00Z` and ends at `2026-07-01T
 
 I use lazy reset. There is no destructive monthly reset job. A new `quota_counters` row is created for the current period when needed. Old period rows remain available for historical reporting.
 
-The monthly limit is copied from `quota_limits` into `quota_counters` when the period row is created. Once a period counter exists, changing the configured limit does not rewrite it. If the feature has not been used in the current month, the latest configured limit is used when its first counter is created.
+The monthly limit is copied from `quota_limits` into `quota_counters` when the period row is created. I treat that value as a snapshot: later configuration changes do not modify an existing counter. The new limit applies the next time a counter is created, which may still be the current month if that feature has not been used yet.
+
+This keeps the limit stable during an active period and avoids having to define what happens when a new limit is lower than units already used or reserved. The tradeoff is that a mid-month increase or decrease does not affect a counter that already exists.
 
 ## Concurrent correctness
 
