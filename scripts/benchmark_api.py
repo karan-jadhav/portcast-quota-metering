@@ -37,7 +37,11 @@ async def cleanup(org_ids: list[UUID]) -> None:
 
 
 async def run(
-    rate: int, duration: int, concurrency: int, organizations: int
+    rate: int,
+    duration: int,
+    concurrency: int,
+    organizations: int,
+    warmup: int,
 ) -> None:
     requests = rate * duration
     org_ids = [uuid4() for _ in range(organizations)]
@@ -45,7 +49,10 @@ async def run(
     for org_id in org_ids:
         async with AsyncSessionLocal() as db:
             await configure_quota(
-                db, org_id, FEATURE, math.ceil(requests / organizations) + 1
+                db,
+                org_id,
+                FEATURE,
+                math.ceil((requests + warmup) / organizations) + 1,
             )
 
     limits = httpx.Limits(max_connections=concurrency)
@@ -57,19 +64,31 @@ async def run(
         semaphore = asyncio.Semaphore(concurrency)
         results: list[tuple[str, float]] = []
 
-        async def consume(index: int) -> None:
+        async def consume(index: int, measured: bool) -> None:
             async with semaphore:
                 started = perf_counter()
+                prefix = "benchmark" if measured else "warmup"
                 response = await client.post(
                     f"/user/orgs/{org_ids[index % organizations]}"
                     f"/features/{FEATURE}/items",
-                    headers={"Idempotency-Key": f"benchmark-{index}"},
+                    headers={"Idempotency-Key": f"{prefix}-{index}"},
                     json={"items": [f"item-{index}"]},
                 )
                 outcome = "accepted" if response.status_code == 200 else "error"
-                results.append((outcome, (perf_counter() - started) * 1000))
+                if not measured and outcome == "error":
+                    raise RuntimeError(
+                        f"warmup request returned HTTP {response.status_code}"
+                    )
+                if measured:
+                    results.append((outcome, (perf_counter() - started) * 1000))
 
         try:
+            if warmup:
+                console.print(f"Warming up with {warmup} requests...")
+                await asyncio.gather(
+                    *(consume(index, False) for index in range(warmup))
+                )
+
             console.print(
                 f"Running {requests:,} consumer requests at {rate:,}/s "
                 f"across {organizations} organization(s)..."
@@ -80,7 +99,7 @@ async def run(
                 delay = started + index / rate - perf_counter()
                 if delay > 0:
                     await asyncio.sleep(delay)
-                tasks.append(asyncio.create_task(consume(index)))
+                tasks.append(asyncio.create_task(consume(index, True)))
 
             await asyncio.gather(*tasks)
             elapsed = perf_counter() - started
@@ -96,6 +115,7 @@ async def run(
                 "p50 ms",
                 "p95 ms",
                 "p99 ms",
+                "Max ms",
             )
             for column in columns:
                 table.add_column(column, justify="right")
@@ -107,6 +127,7 @@ async def run(
                 f"{percentile(latencies, 50):.2f}",
                 f"{percentile(latencies, 95):.2f}",
                 f"{percentile(latencies, 99):.2f}",
+                f"{max(latencies):.2f}",
             )
             console.print(table)
         finally:
@@ -118,8 +139,9 @@ def main(
     duration: int = typer.Option(10, min=1),
     concurrency: int = typer.Option(10, min=1),
     organizations: int = typer.Option(100, min=1),
+    warmup: int = typer.Option(200, min=0),
 ) -> None:
-    asyncio.run(run(rate, duration, concurrency, organizations))
+    asyncio.run(run(rate, duration, concurrency, organizations, warmup))
 
 
 if __name__ == "__main__":

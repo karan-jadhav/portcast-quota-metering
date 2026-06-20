@@ -37,7 +37,11 @@ async def cleanup(org_ids: list[UUID]) -> None:
 
 
 async def run(
-    rate: int, duration: int, concurrency: int, organizations: int
+    rate: int,
+    duration: int,
+    concurrency: int,
+    organizations: int,
+    warmup: int,
 ) -> None:
     requests = rate * duration
     org_ids = [uuid4() for _ in range(organizations)]
@@ -45,13 +49,16 @@ async def run(
     for org_id in org_ids:
         async with AsyncSessionLocal() as db:
             await configure_quota(
-                db, org_id, FEATURE, math.ceil(requests / organizations) + 1
+                db,
+                org_id,
+                FEATURE,
+                math.ceil((requests + warmup) / organizations) + 1,
             )
 
     semaphore = asyncio.Semaphore(concurrency)
     results: list[tuple[str, float]] = []
 
-    async def reserve(index: int) -> None:
+    async def reserve(index: int, measured: bool) -> None:
         async with semaphore, AsyncSessionLocal() as db:
             started = perf_counter()
             try:
@@ -60,15 +67,20 @@ async def run(
                     org_ids[index % organizations],
                     FEATURE,
                     1,
-                    f"benchmark-{index}",
+                    f"{'benchmark' if measured else 'warmup'}-{index}",
                     datetime.now(UTC),
                 )
                 outcome = "accepted"
             except QuotaExceededError:
                 outcome = "rejected"
-            results.append((outcome, (perf_counter() - started) * 1000))
+            if measured:
+                results.append((outcome, (perf_counter() - started) * 1000))
 
     try:
+        if warmup:
+            console.print(f"Warming up with {warmup} operations...")
+            await asyncio.gather(*(reserve(index, False) for index in range(warmup)))
+
         console.print(
             f"Running {requests:,} quota operations at {rate:,}/s "
             f"across {organizations} organization(s)..."
@@ -79,7 +91,7 @@ async def run(
             delay = started + index / rate - perf_counter()
             if delay > 0:
                 await asyncio.sleep(delay)
-            tasks.append(asyncio.create_task(reserve(index)))
+            tasks.append(asyncio.create_task(reserve(index, True)))
 
         await asyncio.gather(*tasks)
         elapsed = perf_counter() - started
@@ -95,6 +107,7 @@ async def run(
             "p50 ms",
             "p95 ms",
             "p99 ms",
+            "Max ms",
         )
         for column in columns:
             table.add_column(column, justify="right")
@@ -106,6 +119,7 @@ async def run(
             f"{percentile(latencies, 50):.2f}",
             f"{percentile(latencies, 95):.2f}",
             f"{percentile(latencies, 99):.2f}",
+            f"{max(latencies):.2f}",
         )
         console.print(table)
     finally:
@@ -113,12 +127,13 @@ async def run(
 
 
 def main(
-    rate: int = typer.Option(200, min=1),
+    rate: int = typer.Option(250, min=1),
     duration: int = typer.Option(10, min=1),
     concurrency: int = typer.Option(30, min=1),
     organizations: int = typer.Option(100, min=1),
+    warmup: int = typer.Option(200, min=0),
 ) -> None:
-    asyncio.run(run(rate, duration, concurrency, organizations))
+    asyncio.run(run(rate, duration, concurrency, organizations, warmup))
 
 
 if __name__ == "__main__":

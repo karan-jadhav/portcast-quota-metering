@@ -143,70 +143,79 @@ The usage endpoint returns the current period usage for an organization and feat
 
 ## Load test results
 
-The benchmarks were run locally with one application process and one PostgreSQL instance. Production throughput would need to be measured with all eight instances sharing the same database.
+The benchmarks were run locally with one application process and one PostgreSQL instance. I measured the direct quota component and the HTTP demo endpoint separately because the assignment's latency target applies to the quota operation in the request path.
+
+These numbers are local benchmark results, not a production capacity claim. In production, I would repeat the same tests with the real deployment topology, database size, connection pool settings, and eight application instances sharing the same database.
 
 ### Hot organization correctness
 
 The concurrency test sends 1,000 reservation attempts to the same organization and feature with a quota limit of 100.
 
-```text
 Results:
-- accepted: 100
-- rejected: 900
-- final used_units: 0
-- final reserved_units: 100
-- final available_units: 0
-- quota violations: 0
+
+```text
+accepted: 100
+rejected: 900
+final used_units: 0
+final reserved_units: 100
+final available_units: 0
+quota violations: 0
 ```
+
+This test exercises reservation only, so the accepted units remain in `reserved_units` rather than `used_units`.
 
 The final counter matched the configured limit exactly. A second concurrency test sends 50 requests with the same idempotency key and verifies that only one reservation and one unit are recorded.
 
 ### Distributed quota traffic
 
-This test calls the quota reservation component directly and spreads requests across 100 organizations.
+This benchmark calls the quota reservation component directly and spreads requests across 100 organizations.
+
+I used 250 operations per second as a reproducible local target for measuring the single-process quota path.
+
+The script first sends 200 unmeasured requests. This creates the monthly counters and warms the database connection pool before the measured requests begin.
 
 ```bash
 python -m scripts.benchmark_quota \
-  --rate 200 --duration 10 --concurrency 30 --organizations 100
+  --rate 250 --duration 10 --concurrency 30 --organizations 100 --warmup 200
 ```
 
-```text
-Results:
-- target throughput: 200 operations/second
-- achieved throughput: 200 operations/second
-- accepted: 2,000
-- rejected: 0
-- errors: 0
-- p50 latency: 5.71 ms
-- p95 latency: 48.00 ms
-- p99 latency: 557.53 ms
-- max latency: 642.19 ms
-```
+| Metric              |  Cold run | Warm run |
+| ------------------- | --------: | -------: |
+| Achieved throughput |     250/s |    250/s |
+| Accepted            |     2,500 |    2,500 |
+| Rejected            |         0 |        0 |
+| Errors              |         0 |        0 |
+| p50 latency         |   4.74 ms |  4.79 ms |
+| p95 latency         |  36.16 ms |  6.99 ms |
+| p99 latency         | 561.71 ms | 16.67 ms |
+| Max latency         | 679.86 ms | 29.31 ms |
 
-The median quota operation was below 10 ms. Tail latency was much higher. The first requests also create monthly counters and establish database connections, and the local machine showed scheduling and connection-pool delays under concurrency.
+The cold run used `--warmup 0` and included counter creation and connection-pool startup. Once those were removed from the measured phase, the benchmark sustained 250 operations per second with p50 and p95 below 10 ms. The p99 result was 16.67 ms.
 
 ### Consumer API traffic
 
-This test sends requests through the demo consumer endpoint. It includes HTTP handling, validation, reserve, the demo operation, and commit, so it is not directly comparable to the 10 ms quota-operation target.
+This benchmark sends requests through the demo consumer endpoint. It includes HTTP handling, request validation, quota reserve, the demo operation, and quota commit, so it is not directly comparable to the direct quota-operation benchmark.
+
+This script also sends 200 unmeasured warmup requests before collecting results.
 
 ```bash
 python -m scripts.benchmark_api \
-  --rate 200 --duration 10 --concurrency 30 --organizations 100
+  --rate 200 --duration 10 --concurrency 30 --organizations 100 --warmup 200
 ```
 
-```text
-Results:
-- target throughput: 200 requests/second
-- achieved throughput: 166 requests/second
-- accepted: 2,000
-- errors: 0
-- p50 latency: 123.84 ms
-- p95 latency: 623.81 ms
-- p99 latency: 960.16 ms
-- max latency: 1,577.97 ms
-```
+| Metric              |    Cold run |  Warm run |
+| ------------------- | ----------: | --------: |
+| Achieved throughput |       166/s |     200/s |
+| Accepted            |       2,000 |     2,000 |
+| Errors              |           0 |         0 |
+| p50 latency         |   123.84 ms |  15.24 ms |
+| p95 latency         |   623.81 ms | 142.03 ms |
+| p99 latency         |   960.16 ms | 311.55 ms |
+| Max latency         | 1,577.97 ms | 505.06 ms |
 
-All requests completed, but the consumer endpoint did not sustain the requested rate on this local setup. Once requests arrived faster than they completed, they waited for application and database capacity.
+After warmup, the consumer endpoint sustained the requested 200 requests per second with no errors. The API benchmark is more sensitive to client scheduling, HTTP connection reuse, FastAPI validation, and the fact that each successful request performs both reserve and commit.
+
+I use the direct quota benchmark as the main measurement for quota-operation overhead, and the API benchmark as an end-to-end smoke test of the demo consumer.
 
 ## Limits
 
