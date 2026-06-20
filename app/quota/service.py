@@ -95,7 +95,7 @@ async def reserve_quota(
                 )
             if existing["units"] != units:
                 raise ValueError("idempotency key already used with different units")
-            return existing
+            return existing, False
 
         counter = await repository.reserve_units(
             db, org_id, feature, period.start, units
@@ -103,7 +103,7 @@ async def reserve_quota(
         if counter is None:
             raise QuotaExceededError("not enough quota available")
 
-        return reservation
+        return reservation, True
 
 
 async def commit_reservation(db: AsyncSession, reservation_id: UUID):

@@ -18,14 +18,14 @@ async def test_reserve_commit_and_release(quota_factory) -> None:
     org_id, feature = await quota_factory(10)
 
     async with AsyncSessionLocal() as db:
-        committed = await reserve_quota(
+        committed, _ = await reserve_quota(
             db, org_id, feature, 4, "commit-request", datetime.now(UTC)
         )
     async with AsyncSessionLocal() as db:
         await commit_reservation(db, committed["reservation_id"])
 
     async with AsyncSessionLocal() as db:
-        released = await reserve_quota(
+        released, _ = await reserve_quota(
             db, org_id, feature, 3, "release-request", datetime.now(UTC)
         )
     async with AsyncSessionLocal() as db:
@@ -42,11 +42,11 @@ async def test_idempotency_does_not_reserve_twice(quota_factory) -> None:
     org_id, feature = await quota_factory(10)
 
     async with AsyncSessionLocal() as db:
-        first = await reserve_quota(
+        first, first_created = await reserve_quota(
             db, org_id, feature, 3, "same-key", datetime.now(UTC)
         )
     async with AsyncSessionLocal() as db:
-        retry = await reserve_quota(
+        retry, retry_created = await reserve_quota(
             db, org_id, feature, 3, "same-key", datetime.now(UTC)
         )
 
@@ -65,6 +65,8 @@ async def test_idempotency_does_not_reserve_twice(quota_factory) -> None:
         ).scalar_one()
 
     assert first["reservation_id"] == retry["reservation_id"]
+    assert first_created is True
+    assert retry_created is False
     assert counter == 3
 
 
@@ -107,7 +109,7 @@ async def test_expired_reservation_returns_capacity(quota_factory) -> None:
     org_id, feature = await quota_factory(10)
 
     async with AsyncSessionLocal() as db:
-        reservation = await reserve_quota(
+        reservation, _ = await reserve_quota(
             db, org_id, feature, 2, "expired", datetime.now(UTC)
         )
 

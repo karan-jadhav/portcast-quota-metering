@@ -43,7 +43,7 @@ async def consume_items(
     units = len(request.items)
 
     try:
-        reservation = await service.reserve_quota(
+        reservation, created = await service.reserve_quota(
             db,
             org_id,
             feature,
@@ -63,17 +63,22 @@ async def consume_items(
     reservation_id = reservation["reservation_id"]
     reservation_status = reservation["status"]
 
-    if reservation_status == "committed":
+    if not created and reservation_status == "committed":
         return ProcessItemsResponse(
             reservation_id=reservation_id,
             processed_items=reservation["units"],
             status=reservation_status,
         )
 
-    if reservation_status != "reserved":
+    if not created:
+        detail = (
+            "request is already in progress"
+            if reservation_status == "reserved"
+            else f"reservation is already {reservation_status}"
+        )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"reservation is already {reservation_status}",
+            detail=detail,
         )
 
     try:

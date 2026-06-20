@@ -87,7 +87,7 @@ async def test_consumer_reserves_and_commits(api_client) -> None:
         patch.object(
             consumer_routes.service,
             "reserve_quota",
-            AsyncMock(return_value=reserved),
+            AsyncMock(return_value=(reserved, True)),
         ) as reserve,
         patch.object(
             consumer_routes.service,
@@ -123,7 +123,7 @@ async def test_consumer_releases_after_downstream_failure(api_client) -> None:
         patch.object(
             consumer_routes.service,
             "reserve_quota",
-            AsyncMock(return_value=reserved),
+            AsyncMock(return_value=(reserved, True)),
         ),
         patch.object(
             consumer_routes.service,
@@ -139,6 +139,33 @@ async def test_consumer_releases_after_downstream_failure(api_client) -> None:
 
     assert response.status_code == 502
     release.assert_awaited_once_with(db, reservation_id)
+
+
+async def test_consumer_does_not_repeat_in_progress_work(api_client) -> None:
+    client, _ = api_client
+    reserved = {
+        "reservation_id": uuid4(),
+        "units": 1,
+        "status": "reserved",
+    }
+
+    with (
+        patch.object(
+            consumer_routes.service,
+            "reserve_quota",
+            AsyncMock(return_value=(reserved, False)),
+        ),
+        patch.object(consumer_routes, "process_items") as process,
+    ):
+        response = await client.post(
+            f"/user/orgs/{ORG_ID}/features/{FEATURE}/items",
+            headers={"Idempotency-Key": "request-1"},
+            json={"items": ["one"]},
+        )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "request is already in progress"
+    process.assert_not_called()
 
 
 async def test_consumer_returns_429_when_quota_is_exhausted(api_client) -> None:

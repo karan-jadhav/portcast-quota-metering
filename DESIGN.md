@@ -113,7 +113,7 @@ Each quota-consuming request includes an idempotency key.
 org_id, feature, period_start, idempotency_key
 ```
 
-If the same request is retried with the same key, the existing reservation is returned instead of reserving quota again. A retry using the same key with a different unit count is rejected. This prevents double-charging when clients retry after a timeout.
+If the same request is retried with the same key, the existing reservation is returned instead of reserving quota again. If it is still reserved, the consumer returns `409 Conflict` and does not run the downstream operation again. A committed reservation returns the previous success. A retry using the same key with a different unit count is rejected.
 
 Commit and release operations only apply to reservations still in `reserved` status. This prevents double-commit or double-release.
 

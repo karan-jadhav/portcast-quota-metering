@@ -91,6 +91,7 @@ async def test_concurrent_retry_reserves_once(quota_factory) -> None:
             .one()
         )
 
-    assert len({item["reservation_id"] for item in reservations}) == 1
+    assert len({item[0]["reservation_id"] for item in reservations}) == 1
+    assert sum(created for _, created in reservations) == 1
     assert row["reserved_units"] == 1
     assert row["reservations"] == 1
