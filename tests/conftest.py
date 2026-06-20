@@ -33,6 +33,16 @@ async def api_client() -> AsyncIterator[tuple[httpx.AsyncClient, object]]:
 
 
 @pytest_asyncio.fixture
+async def real_api_client() -> AsyncIterator[httpx.AsyncClient]:
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test"
+    ) as client:
+        yield client
+
+
+@pytest_asyncio.fixture
 async def quota_factory() -> AsyncIterator[
     Callable[[int], Awaitable[tuple[UUID, str]]]
 ]:

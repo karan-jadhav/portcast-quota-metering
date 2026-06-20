@@ -204,3 +204,43 @@ async def test_consumer_requires_items_and_idempotency_key(api_client) -> None:
 
     assert missing_key.status_code == 422
     assert empty_items.status_code == 422
+
+
+async def test_consumer_retry_charges_quota_once(
+    real_api_client, quota_factory
+) -> None:
+    org_id, feature = await quota_factory(10)
+    path = f"/user/orgs/{org_id}/features/{feature}/items"
+    headers = {"Idempotency-Key": "same-request"}
+    body = {"items": ["one", "two"]}
+
+    first = await real_api_client.post(path, headers=headers, json=body)
+    retry = await real_api_client.post(path, headers=headers, json=body)
+    usage = await real_api_client.get(
+        f"/quota/orgs/{org_id}/features/{feature}"
+    )
+
+    assert first.status_code == 200
+    assert retry.status_code == 200
+    assert retry.json()["reservation_id"] == first.json()["reservation_id"]
+    assert usage.json()["used_units"] == 2
+    assert usage.json()["available_units"] == 8
+
+
+async def test_consumer_failure_returns_quota(
+    real_api_client, quota_factory
+) -> None:
+    org_id, feature = await quota_factory(10)
+
+    response = await real_api_client.post(
+        f"/user/orgs/{org_id}/features/{feature}/items",
+        headers={"Idempotency-Key": "failed-request"},
+        json={"items": ["one", "two"], "simulate_failure": True},
+    )
+    usage = await real_api_client.get(
+        f"/quota/orgs/{org_id}/features/{feature}"
+    )
+
+    assert response.status_code == 502
+    assert usage.json()["used_units"] == 0
+    assert usage.json()["available_units"] == 10
