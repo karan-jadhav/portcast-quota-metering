@@ -133,13 +133,15 @@ The usage endpoint returns the current period usage for an organization and feat
 
 ```json
 {
+  "limit_units": 500,
   "used_units": 300,
+  "reserved_units": 20,
   "available_units": 180,
   "next_reset_at": "2026-07-01T00:00:00Z"
 }
 ```
 
-`available_units` excludes active reservations as well as committed usage. This means in-flight work is not reported as available capacity.
+`reserved_units` shows quota held by in-flight work. `available_units` excludes these reservations as well as committed usage.
 
 ## Load test results
 

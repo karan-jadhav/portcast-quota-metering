@@ -45,7 +45,9 @@ async def test_usage_response(api_client) -> None:
         "get_feature_usage",
         AsyncMock(
             return_value={
+                "limit_units": 120,
                 "used_units": 12,
+                "reserved_units": 20,
                 "available_units": 88,
                 "next_reset_at": reset,
             }
@@ -55,7 +57,9 @@ async def test_usage_response(api_client) -> None:
 
     assert response.status_code == 200
     assert response.json() == {
+        "limit_units": 120,
         "used_units": 12,
+        "reserved_units": 20,
         "available_units": 88,
         "next_reset_at": "2026-07-01T00:00:00Z",
     }
@@ -216,9 +220,7 @@ async def test_consumer_retry_charges_quota_once(
 
     first = await real_api_client.post(path, headers=headers, json=body)
     retry = await real_api_client.post(path, headers=headers, json=body)
-    usage = await real_api_client.get(
-        f"/quota/orgs/{org_id}/features/{feature}"
-    )
+    usage = await real_api_client.get(f"/quota/orgs/{org_id}/features/{feature}")
 
     assert first.status_code == 200
     assert retry.status_code == 200
@@ -227,9 +229,7 @@ async def test_consumer_retry_charges_quota_once(
     assert usage.json()["available_units"] == 8
 
 
-async def test_consumer_failure_returns_quota(
-    real_api_client, quota_factory
-) -> None:
+async def test_consumer_failure_returns_quota(real_api_client, quota_factory) -> None:
     org_id, feature = await quota_factory(10)
 
     response = await real_api_client.post(
@@ -237,9 +237,7 @@ async def test_consumer_failure_returns_quota(
         headers={"Idempotency-Key": "failed-request"},
         json={"items": ["one", "two"], "simulate_failure": True},
     )
-    usage = await real_api_client.get(
-        f"/quota/orgs/{org_id}/features/{feature}"
-    )
+    usage = await real_api_client.get(f"/quota/orgs/{org_id}/features/{feature}")
 
     assert response.status_code == 502
     assert usage.json()["used_units"] == 0

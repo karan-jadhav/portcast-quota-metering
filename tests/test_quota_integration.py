@@ -34,7 +34,9 @@ async def test_reserve_commit_and_release(quota_factory) -> None:
     async with AsyncSessionLocal() as db:
         usage = await get_feature_usage(db, org_id, feature)
 
+    assert usage["limit_units"] == 10
     assert usage["used_units"] == 4
+    assert usage["reserved_units"] == 0
     assert usage["available_units"] == 6
 
 

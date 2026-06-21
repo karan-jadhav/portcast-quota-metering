@@ -12,7 +12,9 @@ router = APIRouter(prefix="/quota", tags=["quota"])
 
 
 class QuotaUsageResponse(BaseModel):
+    limit_units: int
     used_units: int
+    reserved_units: int
     available_units: int
     next_reset_at: datetime
 
@@ -34,7 +36,9 @@ async def get_feature_usage(
         ) from exc
 
     return QuotaUsageResponse(
+        limit_units=usage["limit_units"],
         used_units=usage["used_units"],
+        reserved_units=usage["reserved_units"],
         available_units=usage["available_units"],
         next_reset_at=usage["next_reset_at"],
     )

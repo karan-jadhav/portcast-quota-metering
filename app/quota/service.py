@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta
 from typing import TypedDict
 from uuid import UUID
 
+from sqlalchemy.engine import RowMapping
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.quota import repository
@@ -17,7 +18,9 @@ class ReservationError(Exception):
 
 
 class FeatureUsage(TypedDict):
+    limit_units: int
     used_units: int
+    reserved_units: int
     available_units: int
     next_reset_at: datetime
 
@@ -48,7 +51,9 @@ async def get_feature_usage(
         raise ValueError("quota is not configured for this organization and feature")
 
     return {
+        "limit_units": usage["limit_units"],
         "used_units": usage["used_units"],
+        "reserved_units": usage["reserved_units"],
         "available_units": usage["available_units"],
         "next_reset_at": period.next_reset_at,
     }
@@ -61,7 +66,7 @@ async def reserve_quota(
     units: int,
     idempotency_key: str,
     now: datetime,
-):
+) -> tuple[RowMapping, bool]:
     if units <= 0:
         raise ValueError("units must be greater than zero")
     if not idempotency_key:

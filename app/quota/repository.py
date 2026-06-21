@@ -278,7 +278,10 @@ async def get_feature_usage(
     result = await db.execute(
         text(
             """
-            SELECT COALESCE(counter.used_units, 0) AS used_units,
+            SELECT COALESCE(counter.limit_units, quota_limit.limit_units)
+                       AS limit_units,
+                   COALESCE(counter.used_units, 0) AS used_units,
+                   COALESCE(counter.reserved_units, 0) AS reserved_units,
                    COALESCE(counter.limit_units, quota_limit.limit_units)
                    - COALESCE(counter.used_units, 0)
                    - COALESCE(counter.reserved_units, 0) AS available_units
