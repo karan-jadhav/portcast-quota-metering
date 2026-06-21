@@ -1,4 +1,4 @@
-# Portcast Quota Metering Assessment
+# Portcast Assessment
 
 This repository contains my implementation of the Portcast per-customer quota metering take-home assignment. It uses PostgreSQL-backed monthly counters and reservations to handle concurrent requests, retries, and downstream failures.
 
@@ -20,7 +20,7 @@ Open the API documentation at [http://localhost:8000/docs](http://localhost:8000
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `PUT` | `/admin/orgs/{org_id}/features/{feature}/quota` | Configure a monthly limit |
+| `PUT` | `/admin/orgs/{org_id}/features/{feature}/quota` | Create or update a monthly quota limit |
 | `POST` | `/user/orgs/{org_id}/features/{feature}/items` | Process items using quota |
 | `GET` | `/quota/orgs/{org_id}/features/{feature}` | Read current usage and reset time |
 
@@ -91,13 +91,15 @@ The test suite includes concurrent requests against the same quota bucket and ve
 Measure the quota reservation path directly:
 
 ```bash
-docker compose exec app python -m scripts.load_test_quota
+docker compose exec app python -m scripts.load_test_quota \
+  --rate 250 --duration 10 --concurrency 30 --organizations 100 --warmup 200
 ```
 
 Measure the complete consumer request:
 
 ```bash
-docker compose exec app python -m scripts.load_test_api
+docker compose exec app python -m scripts.load_test_api \
+  --rate 200 --duration 10 --concurrency 30 --organizations 100 --warmup 200
 ```
 
 Both scripts run inside the application container. They accept options for rate, duration, concurrency, organization count, and warmup requests.
