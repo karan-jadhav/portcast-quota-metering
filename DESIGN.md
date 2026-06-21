@@ -145,9 +145,9 @@ The usage endpoint returns the current period usage for an organization and feat
 
 ## Load test results
 
-The benchmarks were run locally with one application process and one PostgreSQL instance. I measured the direct quota component and the HTTP demo endpoint separately because the assignment's latency target applies to the quota operation in the request path.
+The load tests were run locally with one application process and one PostgreSQL instance. I measured the direct quota component and the HTTP demo endpoint separately because the assignment's latency target applies to the quota operation in the request path.
 
-These numbers are local benchmark results, not a production capacity claim. In production, I would repeat the same tests with the real deployment topology, database size, connection pool settings, and eight application instances sharing the same database.
+These numbers are local load-test results, not a production capacity claim. In production, I would repeat the same tests with the real deployment topology, database size, connection pool settings, and eight application instances sharing the same database.
 
 ### Hot organization correctness
 
@@ -170,14 +170,14 @@ The final counter matched the configured limit exactly. A second concurrency tes
 
 ### Distributed quota traffic
 
-This benchmark calls the quota reservation component directly and spreads requests across 100 organizations.
+This load test calls the quota reservation component directly and spreads requests across 100 organizations.
 
 I used 250 operations per second as a reproducible local target for measuring the single-process quota path.
 
 The script first sends 200 unmeasured requests. This creates the monthly counters and warms the database connection pool before the measured requests begin.
 
 ```bash
-python -m scripts.benchmark_quota \
+python -m scripts.load_test_quota \
   --rate 250 --duration 10 --concurrency 30 --organizations 100 --warmup 200
 ```
 
@@ -192,16 +192,16 @@ python -m scripts.benchmark_quota \
 | p99 latency         | 561.71 ms | 16.67 ms |
 | Max latency         | 679.86 ms | 29.31 ms |
 
-The cold run used `--warmup 0` and included counter creation and connection-pool startup. Once those were removed from the measured phase, the benchmark sustained 250 operations per second with p50 and p95 below 10 ms. The p99 result was 16.67 ms.
+The cold run used `--warmup 0` and included counter creation and connection-pool startup. Once those were removed from the measured phase, the load test sustained 250 operations per second with p50 and p95 below 10 ms. The p99 result was 16.67 ms.
 
 ### Consumer API traffic
 
-This benchmark sends requests through the demo consumer endpoint. It includes HTTP handling, request validation, quota reserve, the demo operation, and quota commit, so it is not directly comparable to the direct quota-operation benchmark.
+This load test sends requests through the demo consumer endpoint. It includes HTTP handling, request validation, quota reserve, the demo operation, and quota commit, so it is not directly comparable to the direct quota-operation load test.
 
 This script also sends 200 unmeasured warmup requests before collecting results.
 
 ```bash
-python -m scripts.benchmark_api \
+python -m scripts.load_test_api \
   --rate 200 --duration 10 --concurrency 30 --organizations 100 --warmup 200
 ```
 
@@ -215,9 +215,9 @@ python -m scripts.benchmark_api \
 | p99 latency         |   960.16 ms | 311.55 ms |
 | Max latency         | 1,577.97 ms | 505.06 ms |
 
-After warmup, the consumer endpoint sustained the requested 200 requests per second with no errors. The API benchmark is more sensitive to client scheduling, HTTP connection reuse, FastAPI validation, and the fact that each successful request performs both reserve and commit.
+After warmup, the consumer endpoint sustained the requested 200 requests per second with no errors. The API load test is more sensitive to client scheduling, HTTP connection reuse, FastAPI validation, and the fact that each successful request performs both reserve and commit.
 
-I use the direct quota benchmark as the main measurement for quota-operation overhead, and the API benchmark as an end-to-end smoke test of the demo consumer.
+I use the direct quota load test as the main measurement for quota-operation overhead, and the API load test as an end-to-end smoke test of the demo consumer.
 
 ## Limits
 
@@ -256,4 +256,4 @@ Rejected because PostgreSQL row-level locking already gives the required seriali
 
 ## AI assistance
 
-I used AI assistance for design discussion, implementation suggestions, test and benchmark review, and wording help. I reviewed and changed the suggestions, ran the code and benchmarks locally, and made the final decisions about the submitted design and tradeoffs.
+I used AI assistance for design discussion, implementation suggestions, test and load-test review, and wording help. I reviewed and changed the suggestions, ran the code and load tests locally, and made the final decisions about the submitted design and tradeoffs.

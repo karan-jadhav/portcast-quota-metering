@@ -13,7 +13,7 @@ from app.db import AsyncSessionLocal
 from app.quota.service import QuotaExceededError, configure_quota, reserve_quota
 
 
-FEATURE = "benchmark-feature"
+FEATURE = "load-test-feature"
 console = Console(width=120)
 
 
@@ -67,7 +67,7 @@ async def run(
                     org_ids[index % organizations],
                     FEATURE,
                     1,
-                    f"{'benchmark' if measured else 'warmup'}-{index}",
+                    f"{'load-test' if measured else 'warmup'}-{index}",
                     datetime.now(UTC),
                 )
                 outcome = "accepted"
@@ -98,7 +98,7 @@ async def run(
 
         outcomes = [outcome for outcome, _ in results]
         latencies = [latency for _, latency in results]
-        table = Table(title="quota benchmark")
+        table = Table(title="quota load test")
         columns = (
             "Target/s",
             "Achieved/s",

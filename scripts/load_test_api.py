@@ -13,7 +13,7 @@ from app.db import AsyncSessionLocal
 from app.quota.service import configure_quota
 
 
-FEATURE = "benchmark-feature"
+FEATURE = "load-test-feature"
 console = Console(width=120)
 
 
@@ -67,7 +67,7 @@ async def run(
         async def consume(index: int, measured: bool) -> None:
             async with semaphore:
                 started = perf_counter()
-                prefix = "benchmark" if measured else "warmup"
+                prefix = "load-test" if measured else "warmup"
                 response = await client.post(
                     f"/user/orgs/{org_ids[index % organizations]}"
                     f"/features/{FEATURE}/items",
@@ -106,7 +106,7 @@ async def run(
 
             outcomes = [outcome for outcome, _ in results]
             latencies = [latency for _, latency in results]
-            table = Table(title="consumer API benchmark")
+            table = Table(title="consumer API load test")
             columns = (
                 "Target/s",
                 "Achieved/s",

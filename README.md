@@ -9,24 +9,12 @@ The design decisions, load-test results, and known limits are documented in [DES
 Docker is the only prerequisite.
 
 ```bash
-docker compose up --build
+docker compose up --build -d
 ```
 
 This starts PostgreSQL, applies the SQL migrations and seed data on first startup, then starts the API on port 8000.
 
 Open the API documentation at [http://localhost:8000/docs](http://localhost:8000/docs).
-
-The database is stored in a Docker volume. To stop the services:
-
-```bash
-docker compose down
-```
-
-To remove the database and recreate it from the seed data on the next start:
-
-```bash
-docker compose down -v
-```
 
 ## API
 
@@ -47,7 +35,7 @@ app/
   main.py       FastAPI application
 
 migrations/     PostgreSQL schema and seed data
-scripts/        Benchmarks and expired-reservation cleanup
+scripts/        Load tests and expired-reservation cleanup
 tests/          API, integration, period, and concurrency tests
 ```
 
@@ -98,26 +86,26 @@ python -m pytest
 
 The test suite includes concurrent requests against the same quota bucket and verifies that accepted units never exceed the configured limit.
 
-## Benchmarks
+## Load Tests
 
 Measure the quota reservation path directly:
 
 ```bash
-python -m scripts.benchmark_quota
+docker compose exec app python -m scripts.load_test_quota
 ```
 
-With the API running, measure the complete consumer request:
+Measure the complete consumer request:
 
 ```bash
-python -m scripts.benchmark_api
+docker compose exec app python -m scripts.load_test_api
 ```
 
-Both scripts use low local defaults and accept options for rate, duration, concurrency, and organization count.
+Both scripts run inside the application container. They accept options for rate, duration, concurrency, organization count, and warmup requests.
 
 ## Expired Reservations
 
 Reservations that are not committed or released expire after five minutes. Run the cleanup script with:
 
 ```bash
-python -m scripts.cleanup_expired_reservations
+docker compose exec app python -m scripts.cleanup_expired_reservations
 ```
